@@ -35,18 +35,16 @@
 
 
 
-function [xmin,CMAES_struct]=CMAES_GUI_V2(filename,sigma,generations,N,paramNames,paramMeans,paramMins,paramMaxes)   % (mu/mu_w, lambda)-CMA-ES
+function [xmin,CMAES_struct]= CMAES_GUI_V2(filename,sigma,generations,N,paramNames,paramMeans,paramMins,paramMaxes)   % (mu/mu_w, lambda)-CMA-ES
 % --------------------  Initialization --------------------------------
 load(filename)
-trial = '1';
-%% Initialize Variables
 
-% generations = 10;
+%% Initialize Variables
 if counteval == 0
     paramRange_size = paramMaxes-paramMins;
-    paramMean_norm = (paramMeans-paramMins)./paramRange_size; % normalized means (ensures equal weighting of parameters) 
+    paramMean_norm = (paramMeans)./paramRange_size; % normalized means (ensures equal weighting of parameters) 
     paramRange = [paramMins, paramMaxes];
-    paramBounds = (paramRange-paramMins)./paramRange_size;
+    paramBounds = (paramRange)./paramRange_size;
     %paramBounds = (paramRange)./paramRange_size; % aka the normalized boundaries
 
     % Strategy parameter setting: Selection
@@ -112,9 +110,8 @@ end
 % ylabel '\theta'
 % Parameter progression
 
-    
-    CMA_params = figure%trying to initialize so it plots in the app
 
+    CMA_params = figure;
     % met_log = [];
     colormap('hsv')
     colors = hsv(generations+1);
@@ -123,7 +120,6 @@ for i = 1:N
     subplot(N,1,i)
     scatter(0,paramMeans(i),40,colors(1,:))
     hold on
-    %plot(linspace(0,generations,100), zeros(100),'-k')
     ylabel(paramNames{i})
 %     ylim(variable1_range_norm)
 %     ylim(variable2_range_norm)
@@ -132,133 +128,144 @@ for i = 1:N
 end
 % counteval = 0;  % Number of evalution finished
 % x_log = zeros(N,lambda*generations);
-while counteval <= stopeval-1
+while (counteval <= stopeval-1)
+    
+    
+        %     metrates = zeros(lambda,1);
+        % display to command
+        sprintf('Sigma: %.3f',sigma)
+        % Make sure paramMean_norm is a column vector
+        if isrow(paramMean_norm)
+            paramMean_norm = paramMean_norm';
+        end
+        % Generate and evaluate lambda offspring one-by-one
+        for k = 1:lambda
+            counteval = counteval + 1;
+
+    %%%%%%%%%%%% Need to use each variable's sigma to generate means
+            % x holds all normalized candidate parameter sets as columns with lambda
+            % number of columns
+            x(:,k) = paramMean_norm + (sigma * B * (D .* randn(N,1))); % m + sig * Normal(0,C)
+            % Apply hard constraints to the random generated parameters.
+            x(:,k) = apply_constraints_impedance(x(:,k),paramBounds,N);      
+    %         % Re-roll parameter sets of there are repeats
+    %             test = 1; rep_count = 0;
+    %             while rep_count > 0 || test == 1
+    %                 test = 0;
+    %                 rep_count = 0;
+    %                 for l = 1:length(x_log)
+    %                     if x(:,k) == x_log(:,l)
+    %                         rep_count = rep_count + 1;
+    %                     end
+    %                 end
+    %                 if rep_count > 0
+    %                     sprintf('Has repeat')
+    %                     x(:,k) = xmean_norm + sigma * B * (D .* randn(N,1)); % m + sig * Normal(0,C)
+    %                     x(:,k) = apply_constraints_V2(x(:,k),param_bounds,N,scale_norm);
+    %                 end
+    %             end
+    %         x_log(:,counteval) = x(:,k);
+        end   
+
+
+        % Manually evaluate lambda offspring
+
+
+
+        % Collect all metabolic data in one run
+        gen_num = ceil(counteval/lambda); 
+        [metrates] = metabolic_rate_estimation_GUI_v1(x,gen_num,paramNames,fileInfo,fileInfo.speed,N);
+    %     metrates= [10,20,30,40,50,60];
     %     metrates = zeros(lambda,1);
-    % display to command
-    sprintf('Sigma: %.3f',sigma)
-    % Make sure paramMean_norm is a column vector
-    if isrow(paramMean_norm)
-        paramMean_norm = paramMean_norm';
-    end
-    % Generate and evaluate lambda offspring one-by-one
-    for k = 1:lambda
-        counteval = counteval + 1;
-        
-%%%%%%%%%%%% Need to use each variable's sigma to generate means
-        % x holds all normalized candidate parameter sets as columns with lambda
-        % number of columns
-        x(:,k) = paramMean_norm + (sigma * B * (D .* randn(N,1))); % m + sig * Normal(0,C)
-        % Apply hard constraints to the random generated parameters.
-        x(:,k) = apply_constraints_impedance(x(:,k),paramBounds,N);      
-%         % Re-roll parameter sets of there are repeats
-%             test = 1; rep_count = 0;
-%             while rep_count > 0 || test == 1
-%                 test = 0;
-%                 rep_count = 0;
-%                 for l = 1:length(x_log)
-%                     if x(:,k) == x_log(:,l)
-%                         rep_count = rep_count + 1;
-%                     end
-%                 end
-%                 if rep_count > 0
-%                     sprintf('Has repeat')
-%                     x(:,k) = xmean_norm + sigma * B * (D .* randn(N,1)); % m + sig * Normal(0,C)
-%                     x(:,k) = apply_constraints_V2(x(:,k),param_bounds,N,scale_norm);
-%                 end
-%             end
-%         x_log(:,counteval) = x(:,k);
-    end   
-    
-    
-    % Manually evaluate lambda offspring
-    
+    %     for l = 1:lambda
+    %         metrates(l) = boha1(x(:,l));
+    %     end
+        % Sort by fitness and compute weighted mean into xmean
+        [sorted_metrates, idx] = sort(metrates); % Minimization
 
-    
-    % Collect all metabolic data in one run
-    gen_num = ceil(counteval/lambda); 
-    [metrates] = metabolic_rate_estimation_GUI_v1(x,gen_num,paramNames,fileInfo,fileInfo.speed,N);
-%     metrates= [10,20,30,40,50,60];
-%     metrates = zeros(lambda,1);
-%     for l = 1:lambda
-%         metrates(l) = boha1(x(:,l));
-%     end
-    % Sort by fitness and compute weighted mean into xmean
-    [sorted_metrates, idx] = sort(metrates); % Minimization
-    
-    % Storing variables
-    CMAES_struct(gen_num).gen_idx = gen_num;
-    CMAES_struct(gen_num).x_std = sigma;
-    CMAES_struct(gen_num).min_metrate = sorted_metrates(1);
-    CMAES_struct(gen_num).x_mean = paramMean_norm.*paramRange_size+paramMins;
-    CMAES_struct(gen_num).xmean_norm = paramMean_norm;
-    CMAES_struct(gen_num).sigma = sigma;
-    CMAES_struct(gen_num).x_std_children = std(paramRange_size.*x+paramMins,0,2);
-    CMAES_struct(gen_num).x = paramRange_size.*x+paramMins;       
-    CMAES_struct(gen_num).metrates = metrates;
-    CMAES_struct(gen_num).pc = pc;
-    CMAES_struct(gen_num).ps = ps;
-    % Candidate Plotting
-        i=1;
-        bounded = 'Bounded Parameters:\n';
-        figure(CMA_params)
-    for i = 1:N
-        subplot(N,1,i)
-        hold on
-        scatter(repmat(gen_num,1,lambda),x(i,:).*paramRange_size(i)+paramMins(i),40,colors(gen_num,:))
-        scatter(gen_num,CMAES_struct(gen_num).x_mean(i),50,'k')        
-        ylim(paramRange(i,:))
-%     sprintf('Bounded Parameters:\n %.3f,%.3f\n',x)
-        bounded = [bounded '%.3f,'];  %iteratively create an appropriately long string
-        i=i+1;
-    end
+        % Storing variables
+        CMAES_struct(gen_num).gen_idx = gen_num;
+        CMAES_struct(gen_num).x_std = sigma;
+        CMAES_struct(gen_num).min_metrate = sorted_metrates(1);
+        CMAES_struct(gen_num).x_mean = paramMean_norm.*paramRange_size;
+        CMAES_struct(gen_num).xmean_norm = paramMean_norm;
+        CMAES_struct(gen_num).sigma = sigma;
+        CMAES_struct(gen_num).x_std = std(paramRange_size.*x+paramRange(:,1),0,2);
+        CMAES_struct(gen_num).x = paramRange_size.*x+paramRange(:,1);       
+        CMAES_struct(gen_num).metrates = metrates;
+        CMAES_struct(gen_num).pc = pc;
+        CMAES_struct(gen_num).ps = ps;
+        % Candidate Plotting
+            i=1;
+            bounded = 'Bounded Parameters:\n';
+            figure(CMA_params.Number)
+        for i = 1:N
+            subplot(N,1,i)
+            hold on
+            scatter(repmat(gen_num,1,lambda),x(i,:),40,colors(gen_num,:))
+            scatter(gen_num,CMAES_struct(gen_num).x_mean(i),50,'k')        
+            ylim(paramRange(i,:))
+    %     sprintf('Bounded Parameters:\n %.3f,%.3f\n',x)
+            bounded = [bounded '%.3f,'];  %iteratively create an appropriately long string
+            i=i+1;
+        end
+
+        sprintf([bounded '\n'],paramRange_size.*x)   %this was the statement works for all param #'s 
+
+        xold = paramMean_norm;
+        paramMean_norm = x(:,idx(1:mu))*weights;   % Recombination, new mean value
+    %%%%%%% Evolution paths need to update each variable correctly
+        % Cumulation: Update evolution paths
+        ps = (1-cs)*ps ...
+            + sqrt(cs*(2-cs)*mueff) * invsqrtC * (paramMean_norm-xold) / sigma;
+        hsig = norm(ps)/sqrt(1-(1-cs)^(2*counteval/lambda))/chiN < 1.4 + 2/(N+1);
+        pc = (1-cc)*pc ...
+            + hsig * sqrt(cc*(2-cc)*mueff) * (paramMean_norm-xold) / sigma;
+
+        % Adapt covariance matrix C
+        artmp = (1/sigma) * (x(:,idx(1:mu))-repmat(xold,1,mu));
+        C = (1-c1-cmu) * C ...                  % Regard old matrix
+            + c1 * (pc*pc' ...                 % Plus rank one update
+            + (1-hsig) * cc*(2-cc) * C) ... % Minor correction if hsig==0
+            + cmu * artmp * diag(weights) * artmp'; % Plus rank mu update
+
+        % Adapt step size sigma
+        sigma = sigma * exp((cs/damps)*(norm(ps)/chiN - 1));
+
+        % Decomposition of C into B*diag(D.^2)*B' (diagonalization)
+        if counteval - eigeneval > lambda/(c1+cmu)/N/10  % to achieve O(N^2)
+            eigeneval = counteval;
+            C = triu(C) + triu(C,1)'; % Enforce symmetry
+            [B,D] = eig(C);           % Eigen decomposition, B==normalized eigenvectors
+            D = sqrt(diag(D));        % D is a vector of standard deviations now
+            invsqrtC = B * diag(D.^-1) * B';
+        end
+        CMAES_struct(gen_num).New_x_mean = paramMean_norm.*paramRange_size;
+        CMAES_struct(gen_num).New_x_mean_norm = paramMean_norm;
+        CMAES_struct(gen_num).New_sigma = sigma;
+        CMAES_struct(gen_num).New_pc = pc;
+        CMAES_struct(gen_num).New_ps = ps;
+        save(filename) % Save mat file for each trial to review data
+        % Stop CMA-ES optimization if new mean is within 5% of the old mean 
+    %     if mean(abs(xmean-xold)./xold) <= .05
+    %         break
+    %     end
+
+        %pause
+%         sprintf('You have completed %d generations.\nStop and rest for 1-minute\nHit ENTER when ready.',gen_num);
+         pause(3);
+% 
+%         Intext = input('\nType stop to stop experiment:\n','s');
+%         if strcmpi(strtrim(Intext),'stop')
+%             error('Trial Stopped'); 
+%         end
+
+
+
+    % stats = table(gen_idx,gen_xmean,min_metrates,gen_stds,...
+    %     lambda1,lambda2,lambda3,lambda4,metrate1,metrate2,metrate3,metrate4);
    
-    sprintf([bounded '\n'],paramRange_size.*x+paramMins)   %this was the statement works for all param #'s 
-
-    xold = paramMean_norm;
-    paramMean_norm = x(:,idx(1:mu))*weights;   % Recombination, new mean value
-%%%%%%% Evolution paths need to update each variable correctly
-    % Cumulation: Update evolution paths
-    ps = (1-cs)*ps ...
-        + sqrt(cs*(2-cs)*mueff) * invsqrtC * (paramMean_norm-xold) / sigma;
-    hsig = norm(ps)/sqrt(1-(1-cs)^(2*counteval/lambda))/chiN < 1.4 + 2/(N+1);
-    pc = (1-cc)*pc ...
-        + hsig * sqrt(cc*(2-cc)*mueff) * (paramMean_norm-xold) / sigma;
     
-    % Adapt covariance matrix C
-    artmp = (1/sigma) * (x(:,idx(1:mu))-repmat(xold,1,mu));
-    C = (1-c1-cmu) * C ...                  % Regard old matrix
-        + c1 * (pc*pc' ...                 % Plus rank one update
-        + (1-hsig) * cc*(2-cc) * C) ... % Minor correction if hsig==0
-        + cmu * artmp * diag(weights) * artmp'; % Plus rank mu update
-    
-    % Adapt step size sigma
-    sigma = sigma * exp((cs/damps)*(norm(ps)/chiN - 1));
-    
-    % Decomposition of C into B*diag(D.^2)*B' (diagonalization)
-    if counteval - eigeneval > lambda/(c1+cmu)/N/10  % to achieve O(N^2)
-        eigeneval = counteval;
-        C = triu(C) + triu(C,1)'; % Enforce symmetry
-        [B,D] = eig(C);           % Eigen decomposition, B==normalized eigenvectors
-        D = sqrt(diag(D));        % D is a vector of standard deviations now
-        invsqrtC = B * diag(D.^-1) * B';
-    end
-    CMAES_struct(gen_num).New_x_mean = paramMean_norm.*paramRange_size+paramMins;
-    CMAES_struct(gen_num).New_x_mean_norm = paramMean_norm;
-    CMAES_struct(gen_num).New_sigma = sigma;
-    CMAES_struct(gen_num).New_pc = pc;
-    CMAES_struct(gen_num).New_ps = ps;
-    save(filename) % Save mat file for each trial to review data
-    % Stop CMA-ES optimization if new mean is within 5% of the old mean 
-%     if mean(abs(xmean-xold)./xold) <= .05
-%         break
-%     end
-
-    sprintf('You have completed %d generations.\nStop and rest for 1-minute\nHit ENTER when ready.',gen_num)
-%     pause
-    
-
-% stats = table(gen_idx,gen_xmean,min_metrates,gen_stds,...
-%     lambda1,lambda2,lambda3,lambda4,metrate1,metrate2,metrate3,metrate4);
 end
 xmin = paramMean_norm; % Return the last variable distribution as an estimate of the optimal value
 sprintf('You have completed the trial after %d generations!',gen_num)

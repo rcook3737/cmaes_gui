@@ -318,85 +318,106 @@ end
 
 if data_collection
     tic
+    global pauseFlag continueFlag stopFlag; %flags for pause/stop
     while toc < mins*60
-        if test_mode == 1
-            currentFrame = readFrame(v);
-        elseif test_mode == 2
-            currentFrame = snapshot(cam);
-        end
+        if ~pauseFlag
         
-        if test_method == 2
-            % Recreate points for each frame
-            [points1,validity] = tracker1(currentFrame);
-            [points2,validity] = tracker2(currentFrame);
-            
-            %     VO2
-            
-            Left1 = min(points1);
-            Right1 = max(points1);
-            Xoffset1 = rows1 - Left1(1);
-            Yoffset1 = cols1 - Right1(2);
-            % Compute box dimensions for VO2
-            VOX1 = (Left1(1) + Xoffset1 - widthBOX1/2);
-            VOX2 = (Left1(1) + Xoffset1 + widthBOX1/2);
-            VOY1 = (Right1(2) + Yoffset1 - heightBOX1/2);
-            VOY2 = (Right1(2) + Yoffset1 + heightBOX1/2);
-            
-            %       VCO2
-            
-            Left2 = min(points2);
-            Right2 = max(points2);
-            Xoffset2 = rows2 - Left2(1);
-            Yoffset2 = cols2 - Right2(2);
-            % Compute box dimensions for VCO2
-            VCOX1 = (Left2(1) + Xoffset2 - widthBOX2/2);
-            VCOX2 = (Left2(1) + Xoffset2 + widthBOX2/2);
-            VCOY1 = (Right2(2) + Yoffset2 - heightBOX2/2);
-            VCOY2 = (Right2(2) + Yoffset2 + heightBOX2/2);
-        end
-        
-        I = rgb2gray(currentFrame);
-        
-        vo2_text_frame = I(VOY1:VOY2,VOX1:VOX2);
-        vco2_text_frame = I(VCOY1:VCOY2,VCOX1:VCOX2);
-        
-        subplot(1,2,1); imshow(vo2_text_frame);
-        subplot(1,2,2); imshow(vco2_text_frame);
-        % OCR Number reading and output
-        text1 = ocr(vo2_text_frame);
-        text2 = ocr(vco2_text_frame);
-        vo2_text = str2double(text1.Text);
-        vco2_text = str2double(text2.Text);
-        disp(['time  = ' sprintf('%.2f', toc)]);
-        disp(['Vo2      Vco2']);
-        spaces = char(' ' .* ones(1, 6 - (length(num2str(vo2_text)) - 3)));
-        disp([num2str(vo2_text) spaces num2str(vco2_text)]);
-        disp('  ');
-        
-        % Continue to next frame if OCR does not work
-        if isnan(vo2_text) || isnan(vco2_text)
-            continue
-        end
-        
-        % Record new data only and mark time point (OCR based)
-        if data_num == 1
-            vo2_rate(data_num) = vo2_text; %#ok<*AGROW>
-            vco2_rate(data_num) = vco2_text;
-            %         image_check{data_num} = I;
-            %         vo2_rate(frame_num)
-            %         vco2_rate(frame_num)
-            t(data_num) = toc;
-            data_num = data_num + 1;
-        else
-            if vco2_text ~= vco2_rate(data_num-1) && vo2_text ~= vo2_rate(data_num-1)
-                vo2_rate(1,data_num) = vo2_text;
-                vco2_rate(1,data_num) = vco2_text;
+            if test_mode == 1
+                currentFrame = readFrame(v);
+            elseif test_mode == 2
+                currentFrame = snapshot(cam);
+            end
+
+            if test_method == 2
+                % Recreate points for each frame
+                [points1,validity] = tracker1(currentFrame);
+                [points2,validity] = tracker2(currentFrame);
+
+                %     VO2
+
+                Left1 = min(points1);
+                Right1 = max(points1);
+                Xoffset1 = rows1 - Left1(1);
+                Yoffset1 = cols1 - Right1(2);
+                % Compute box dimensions for VO2
+                VOX1 = (Left1(1) + Xoffset1 - widthBOX1/2);
+                VOX2 = (Left1(1) + Xoffset1 + widthBOX1/2);
+                VOY1 = (Right1(2) + Yoffset1 - heightBOX1/2);
+                VOY2 = (Right1(2) + Yoffset1 + heightBOX1/2);
+
+                %       VCO2
+
+                Left2 = min(points2);
+                Right2 = max(points2);
+                Xoffset2 = rows2 - Left2(1);
+                Yoffset2 = cols2 - Right2(2);
+                % Compute box dimensions for VCO2
+                VCOX1 = (Left2(1) + Xoffset2 - widthBOX2/2);
+                VCOX2 = (Left2(1) + Xoffset2 + widthBOX2/2);
+                VCOY1 = (Right2(2) + Yoffset2 - heightBOX2/2);
+                VCOY2 = (Right2(2) + Yoffset2 + heightBOX2/2);
+            end
+
+            I = rgb2gray(currentFrame);
+
+            vo2_text_frame = I(VOY1:VOY2,VOX1:VOX2);
+            vco2_text_frame = I(VCOY1:VCOY2,VCOX1:VCOX2);
+
+            subplot(1,2,1); imshow(vo2_text_frame);
+            subplot(1,2,2); imshow(vco2_text_frame);
+            % OCR Number reading and output
+            text1 = ocr(vo2_text_frame);
+            text2 = ocr(vco2_text_frame);
+            vo2_text = str2double(text1.Text);
+            vco2_text = str2double(text2.Text);
+            disp(['time  = ' sprintf('%.2f', toc)]);
+            disp(['Vo2      Vco2']);
+            spaces = char(' ' .* ones(1, 6 - (length(num2str(vo2_text)) - 3)));
+            disp([num2str(vo2_text) spaces num2str(vco2_text)]);
+            disp('  ');
+
+            % Continue to next frame if OCR does not work
+            if isnan(vo2_text) || isnan(vco2_text)
+                continue
+            end
+
+            % Record new data only and mark time point (OCR based)
+            if data_num == 1
+                vo2_rate(data_num) = vo2_text; %#ok<*AGROW>
+                vco2_rate(data_num) = vco2_text;
+                %         image_check{data_num} = I;
                 %         vo2_rate(frame_num)
                 %         vco2_rate(frame_num)
-                t(1,data_num) = toc;
+                t(data_num) = toc;
                 data_num = data_num + 1;
+            else
+                if vco2_text ~= vco2_rate(data_num-1) && vo2_text ~= vo2_rate(data_num-1)
+                    vo2_rate(1,data_num) = vo2_text;
+                    vco2_rate(1,data_num) = vco2_text;
+                    %         vo2_rate(frame_num)
+                    %         vco2_rate(frame_num)
+                    t(1,data_num) = toc;
+                    data_num = data_num + 1;
+                end
+            end
+        else
+            pauseFlag = false;
+            paused = true;
+            while paused
+               pause(0.1);
+               if continueFlag
+                   paused = false;
+                   continueFlag = false;
+                   stopFlag = false;
+               elseif stopFlag
+                   paused = false;
+                   continueFlag = false;
+                   stopFlag = false;
+                   error('Experiment Stopped');
+               end
             end
         end
+          
     end
     
 %     save('test.mat', 'vo2_rate' ,'vco2_rate' ,'t')
