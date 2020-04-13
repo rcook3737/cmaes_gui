@@ -1,4 +1,4 @@
-    %% Apply contraints to step frequency during optimization
+%% Apply contraints to step frequency during optimization
 
 % This function is used during human-in-the-loop optimization of step
 % length. The high and low bounds are measured before optimization and used
